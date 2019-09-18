@@ -17,7 +17,7 @@ from urllib.request import urlretrieve
 
 from VideoGet import VideoGet
 from VideoShow import VideoShow
-from VideoZed import VideoZed
+# from VideoZed import VideoZed
 
 class DLProgress(tqdm):
   last_block = 0
@@ -153,7 +153,7 @@ def gen_batch_function(glob_trainig_images_path, glob_labels_trainig_image_path,
           raise ValueError("GT IMAGE MUST CONTAIN 3 CHANNELS (JPG FILE)")
 
         gt_bg = np.all(gt_image == background_color, axis=2)
-        gt_bg = gt_bg.reshape(*gt_bg.shape, 1)
+        gt_bg = gt_bg.reshape(gt_bg.shape, 1)
         gt_image = np.concatenate((gt_bg, np.invert(gt_bg)), axis=2)
 
         images.append(image)
@@ -202,17 +202,18 @@ def predict(sess, image, image_pl, keep_prob, logits, image_shape):
     return street_im
 
 def read_zed(sess, image_shape, logits, keep_prob, input_image):
-    count = 0
-    video_zed = VideoZed(sess, image_shape, logits, keep_prob, input_image).start()
+    pass
+    # count = 0
+    # video_zed = VideoZed(sess, image_shape, logits, keep_prob, input_image).start()
 
-    while type(video_zed.frame) == type(None):
-      if count == 3:
-        exit("Error to open ZED")
-      print("Waiting for zed")
-      count+=1
-      time.sleep(1)
+    # while type(video_zed.frame) == type(None):
+    #   if count == 3:
+    #     exit("Error to open ZED")
+    #   print("Waiting for zed")
+    #   count+=1
+    #   time.sleep(1)
       
-    video_shower = VideoShow(video_zed.frame).start()
+    # video_shower = VideoShow(video_zed.frame).start()
 
     while True:
         if video_zed.stopped or video_shower.stopped:

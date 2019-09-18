@@ -23,7 +23,7 @@ def load_vgg(sess, vgg_path):
     """
 
     tf.saved_model.loader.load(sess, ['vgg16'], vgg_path)
-    graph = tf.get_default_graph()
+    graph = tf.compat.v1.get_default_graph()
     w1 = graph.get_tensor_by_name('image_input:0')
     keep = graph.get_tensor_by_name('keep_prob:0')
     layer3 = graph.get_tensor_by_name('layer3_out:0')
@@ -210,7 +210,9 @@ def run():
     # You'll need a GPU with at least 10 teraFLOPS to train on.
     #  https://www.cityscapes-dataset.com/
 
-    with tf.Session() as sess:
+    builder = tf.compat.v1.saved_model.Builder("/content/model_exported")
+
+    with tf.Session(graph=tf.Graph()) as sess:
         # Create function to get batches
         get_batches_fn = helper.gen_batch_function(
             glob_trainig_images_path, 
@@ -234,31 +236,18 @@ def run():
         # tfLogits = tf.get_variable("logits")
         # tfKeepProb = tf.get_variable("keep_prob") TEM NO TF
 
-        print(100*'*')
-        print(image_shape)
-        #(160, 576)
-        print(100*'*')
-        print(logits)
-        #Tensor("Reshape:0", shape=(?, 2), dtype=float32)
-        print(100*'*')
-        print(keep_prob)
-        #Tensor("keep_prob:0", dtype=float32)
-        print(100*'*')
-        print(input_image)
-        #Tensor("image_input:0", shape=(?, ?, ?, 3), dtype=float32)
-        print(100*'*')
-
+        
         init_op = tf.global_variables_initializer()
 
         sess.run(init_op)
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
-                 correct_label, keep_prob, learning_rate)
+                    correct_label, keep_prob, learning_rate)
 
 
         folderToSaveModel = "model"
 
         # Add ops to save and restore all the variables.
-        saver = tf.train.Saver()
+        saver = tf.compat.v1.train.Saver()
         
         for i, var in enumerate(saver._var_list):
             print('Var {}: {}'.format(i, var))
@@ -269,9 +258,12 @@ def run():
         pathSaveModel = os.path.join(folderToSaveModel, "model.ckpt")
         pathSaveModel = saver.save(sess, pathSaveModel)
         print(colored("Model saved in path: {}".format(pathSaveModel), 'green'))
-        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+        #helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
-        # OPTIONAL: Apply the trained model to a video
+        builder.add_meta_graph_and_variables(sess,
+                                        [tf.saved_model.tag_constants.TRAINING],
+                                        tags="vgg16")
+    builder.save()
 
 def all_is_ok():
     # Check TensorFlow Version
@@ -319,7 +311,7 @@ def predict_by_model():
         tf_config = tf.ConfigProto(device_count={'GPU': 0})
     else:
         tf_config = tf.ConfigProto()
-    
+
     with tf.Session(config=tf_config) as sess:
         # Predict the logits
         input_image, keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
@@ -327,7 +319,7 @@ def predict_by_model():
         logits = get_logits(nn_last_layer, num_classes)
 
         # Restore the saved model
-        saver = tf.train.Saver()
+        saver = tf.compat.v1.train.Saver()
         saver.restore(sess, path_model)
         
         if pred_data_from == 'video':

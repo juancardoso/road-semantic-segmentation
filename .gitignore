@@ -109,4 +109,13 @@ data/vgg
 
 env-RoadSeg
 
-model/*
+*.jpg
+*.jpeg
+*.png
+
+*.mp4
+*.webm
+
+*.zip
+
+settings.json
