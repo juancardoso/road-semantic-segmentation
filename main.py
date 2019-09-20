@@ -258,11 +258,11 @@ def run():
         pathSaveModel = os.path.join(folderToSaveModel, "model.ckpt")
         pathSaveModel = saver.save(sess, pathSaveModel)
         print(colored("Model saved in path: {}".format(pathSaveModel), 'green'))
-        #helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
         builder.add_meta_graph_and_variables(sess,
-                                        [tf.saved_model.tag_constants.TRAINING],
-                                        tags="vgg16")
+                                        ["vgg16"],
+                                        saver=saver)
     builder.save()
 
 def all_is_ok():
@@ -304,23 +304,25 @@ def predict_by_model():
     """
     
     # Path to vgg model
-    vgg_path = os.path.join('./data', 'vgg')
+    vgg_path = os.path.join('./data', 'facens')
 
     #IF EXCEED GPU MEMORY, USE THE CONFIG BELOW
     if disable_gpu:
         tf_config = tf.ConfigProto(device_count={'GPU': 0})
     else:
         tf_config = tf.ConfigProto()
-
+        
     with tf.Session(config=tf_config) as sess:
         # Predict the logits
         input_image, keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
         nn_last_layer = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes)
         logits = get_logits(nn_last_layer, num_classes)
 
-        # Restore the saved model
-        saver = tf.compat.v1.train.Saver()
-        saver.restore(sess, path_model)
+        # # Restore the saved model
+        # saver = tf.compat.v1.train.Saver()
+        # saver.restore(sess, path_model)
+        init_op = tf.global_variables_initializer()
+        sess.run(init_op)
         
         if pred_data_from == 'video':
             # Predict a video

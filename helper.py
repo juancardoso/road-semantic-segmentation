@@ -153,7 +153,7 @@ def gen_batch_function(glob_trainig_images_path, glob_labels_trainig_image_path,
           raise ValueError("GT IMAGE MUST CONTAIN 3 CHANNELS (JPG FILE)")
 
         gt_bg = np.all(gt_image == background_color, axis=2)
-        gt_bg = gt_bg.reshape(gt_bg.shape, 1)
+        gt_bg = gt_bg.reshape(*gt_bg.shape, 1)
         gt_image = np.concatenate((gt_bg, np.invert(gt_bg)), axis=2)
 
         images.append(image)
@@ -182,7 +182,7 @@ def gen_test_output(sess, logits, keep_prob, image_pl, data_folder, image_shape)
     street_im = predict(sess, image, image_pl, keep_prob, logits, image_shape)
 
     timeCount = (time.time() - start)
-    print (image_file + " process time: " + str(timeCount))
+    print (image_file + " process time: " + time.strftime("%H:%M:%S", time.gmtime(timeCount)))
     subprocess.call("echo {} - {} >> ./data/data_road/time.txt".format(image_file, timeCount), shell=True)
     
     yield os.path.basename(image_file), np.array(street_im)
