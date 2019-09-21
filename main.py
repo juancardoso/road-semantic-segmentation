@@ -11,6 +11,7 @@ from tensorflow.python.util import compat
 from distutils.version import LooseVersion
 from tensorflow.python.platform import gfile
 from tensorflow.core.protobuf import saved_model_pb2
+from tensorflow.python.tools import freeze_graph, optimize_for_inference_lib
 
 image_shape = (160, 576)
 
@@ -210,7 +211,8 @@ def run():
     # You'll need a GPU with at least 10 teraFLOPS to train on.
     #  https://www.cityscapes-dataset.com/
 
-    builder = tf.compat.v1.saved_model.Builder("/content/model_exported")
+    path_model_exported = os.path.join(os.getcwd(), "model_exported")
+    builder = tf.compat.v1.saved_model.Builder(path_model_exported)
 
     with tf.Session(graph=tf.Graph()) as sess:
         # Create function to get batches
@@ -229,13 +231,10 @@ def run():
         learning_rate = tf.placeholder(tf.float32, name='learning_rate')
         
         input_image, keep_prob, layer3_out, layer4_out, layer7_out = load_vgg(sess, vgg_dir)
+        optimize_graph(input_image, layer3_out, layer4_out, layer7_out)
+        
         layer_output = layers(layer3_out, layer4_out, layer7_out, num_classes)
         logits, train_op, cross_entropy_loss = optimize(layer_output, correct_label, learning_rate, num_classes)
-
-        # tfImShape = tf.get_variable("image_shape")
-        # tfLogits = tf.get_variable("logits")
-        # tfKeepProb = tf.get_variable("keep_prob") TEM NO TF
-
         
         init_op = tf.global_variables_initializer()
 
@@ -249,16 +248,28 @@ def run():
         # Add ops to save and restore all the variables.
         saver = tf.compat.v1.train.Saver()
         
-        for i, var in enumerate(saver._var_list):
-            print('Var {}: {}'.format(i, var))
+        # for i, var in enumerate(saver._var_list):
+        #     print('Var {}: {}'.format(i, var))
 
         if not os.path.exists(folderToSaveModel):
             os.makedirs(path)
 
-        pathSaveModel = os.path.join(folderToSaveModel, "model.ckpt")
-        pathSaveModel = saver.save(sess, pathSaveModel)
+        pathSaveModelCkpt = os.path.join(folderToSaveModel, "model.ckpt")
+        pathSaveModel = saver.save(sess, pathSaveModelCkpt)
+        
+        pathSaveModelPb = os.path.join(folderToSaveModel, "model.pbtxt")
+        tf.train.write_graph(sess.graph.as_graph_def(), '.', pathSaveModelPb, as_text=True)
+
         print(colored("Model saved in path: {}".format(pathSaveModel), 'green'))
-        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+        #helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+
+        pathSaveModelFrozen =  os.path.join(folderToSaveModel, "frozenModel.pb")
+
+        freeze_graph.freeze_graph(pathSaveModelPb, "", False, 
+                                pathSaveModelCkpt, "output/softmax",
+                                "save/restore_all", "save/Const:0",
+                                pathSaveModelFrozen, True, "" 
+                                )
 
         builder.add_meta_graph_and_variables(sess,
                                         ["vgg16"],
@@ -304,7 +315,7 @@ def predict_by_model():
     """
     
     # Path to vgg model
-    vgg_path = os.path.join('./data', 'facens')
+    vgg_path = os.path.join('./data', 'vgg')
 
     #IF EXCEED GPU MEMORY, USE THE CONFIG BELOW
     if disable_gpu:
@@ -318,11 +329,13 @@ def predict_by_model():
         nn_last_layer = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes)
         logits = get_logits(nn_last_layer, num_classes)
 
-        # # Restore the saved model
-        # saver = tf.compat.v1.train.Saver()
-        # saver.restore(sess, path_model)
         init_op = tf.global_variables_initializer()
         sess.run(init_op)
+        
+        # # Restore the saved model
+        saver = tf.compat.v1.train.Saver()
+        saver.restore(sess, path_model)
+        
         
         if pred_data_from == 'video':
             # Predict a video
@@ -341,21 +354,49 @@ def predict_by_model():
         elif pred_data_from == 'zed':
             helper.read_zed(sess, image_shape, logits, keep_prob, input_image)
 
+def optimize_graph(input_image, layer3_out, layer4_out, layer7_out):
+    pass
+    # inputGraph = tf.compat.v1.GraphDef()
+    
+    # # Path to vgg model
+    # vgg_path = os.path.join('./data', 'vgg','saved_model.pb')
+    # output_nodes = [layer3_out,layer4_out, layer7_out]
+    # with tf.io.gfile.GFile(vgg_path, "rb") as f:
+    #     # data2read = f.read()
+    #     #inputGraph.ParseFromString(data2read)
+    #     tf.compat.v1.graph_util.remove_training_nodes(inputGraph, protected_nodes=output_nodes)
+        
+    #     tf.enable_eager_execution()
+    #     # tf.executing_eagerly()
+    #     outputGraph = optimize_for_inference_lib.optimize_for_inference(
+    #                 inputGraph,
+    #                 [input_image], # an array of the input node(s)
+    #                 output_nodes, # an array of output nodes
+    #                 tf.int32.as_datatype_enum)
+
+    #     # Save the optimized graph'test.pb'
+    #     f = tf.gfile.FastGFile('OptimizedGraph.pb', "w")
+    #     f.write(outputGraph.SerializeToString()) 
+
+
 if __name__ == '__main__':
     (disable_gpu,
-     pred_data_from,
-     path_model,
-     path_data,
-     num_classes,
-     epochs,
-     batch_size, 
-     vgg_dir, 
-     learn_rate,
-     log_dir, 
-     data_dir, 
-     graph_visualize,
-     glob_trainig_images_path,
-     glob_labels_trainig_image_path) = helper.get_args()
+    pred_data_from,
+    path_model,
+    path_data,
+    num_classes,
+    epochs,
+    batch_size, 
+    vgg_dir, 
+    learn_rate,
+    log_dir, 
+    data_dir, 
+    graph_visualize,
+    glob_trainig_images_path,
+    glob_labels_trainig_image_path) = helper.get_args()
+
+    # optimize_graph()
+    # exit()
 
     if not path_model:
         all_is_ok()
