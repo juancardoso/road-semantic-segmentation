@@ -110,3 +110,14 @@ data/vgg
 env-RoadSeg
 
 model/*
+
+.vscode
+
+data/*
+
+*.jpeg
+*.jpg
+*.png
+*.webm
+*.mp4
+*.zip
